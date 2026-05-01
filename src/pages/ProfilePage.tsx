@@ -18,17 +18,24 @@ export default function ProfilePage() {
       <section className="grid gap-5">
         <div className="rounded-[2rem] bg-ink p-5 text-white shadow-ambient">
           <div className="flex flex-col gap-6">
-            <div>
-              <p className="text-sm font-extrabold uppercase tracking-[0.16em] text-white/50">
-                A Minha Conta
-              </p>
-              <h1 className="mt-3 text-4xl font-extrabold tracking-normal">
-                {profile.name}
-              </h1>
-              <p className="mt-2 flex items-center gap-2 font-bold text-white/70">
-                <MapPin size={18} />
-                {profile.city}
-              </p>
+            <div className="flex items-end gap-4">
+              <img
+                src={profile.avatarImage}
+                alt={profile.name}
+                className="h-24 w-24 shrink-0 rounded-[1.75rem] object-cover shadow-glow ring-4 ring-white/10"
+              />
+              <div className="min-w-0 flex-1 pb-1">
+                <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-white/50">
+                  A Minha Conta
+                </p>
+                <h1 className="mt-2 text-3xl font-extrabold tracking-normal">
+                  {profile.name}
+                </h1>
+                <p className="mt-2 flex items-center gap-2 font-bold text-white/70">
+                  <MapPin size={18} />
+                  {profile.city}
+                </p>
+              </div>
             </div>
             <span className="inline-flex items-center gap-2 rounded-full bg-orange px-4 py-2 text-sm font-extrabold">
               <Crown size={17} />

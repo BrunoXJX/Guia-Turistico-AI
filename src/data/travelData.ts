@@ -65,7 +65,13 @@ export type AudioGuideState = {
 };
 
 const asset = (index: number) =>
-  `/assets/travelai-${String(index).padStart(2, "0")}.jpg`;
+  `${import.meta.env.BASE_URL}assets/travelai-${String(index).padStart(
+    2,
+    "0",
+  )}.jpg`;
+
+const namedAsset = (fileName: string) =>
+  `${import.meta.env.BASE_URL}assets/${fileName}`;
 
 export const tours: Tour[] = [
   {
@@ -302,8 +308,9 @@ export const audioGuideState: AudioGuideState = {
 };
 
 export const profile = {
-  name: "Ana Silva",
-  level: "Exploradora de Elite",
+  name: "Bruni Jesus",
+  avatarImage: namedAsset("bruni-jesus.jfif"),
+  level: "Explorador de Elite",
   city: "Lisboa",
   completedTours: 28,
   savedHours: 14,

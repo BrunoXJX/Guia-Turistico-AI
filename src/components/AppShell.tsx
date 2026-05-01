@@ -7,6 +7,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { Link, NavLink, Outlet } from "react-router-dom";
+import { profile } from "../data/travelData";
 
 const navItems = [
   { label: "Explorar", to: "/", icon: Compass, end: true },
@@ -31,10 +32,14 @@ export default function AppShell() {
               </Link>
               <Link
                 to="/perfil"
-                className="grid h-10 w-10 place-items-center rounded-full bg-white/80 shadow-ambient backdrop-blur-xl"
+                className="block h-10 w-10 overflow-hidden rounded-full bg-white shadow-ambient ring-2 ring-white"
                 aria-label="Abrir perfil"
               >
-                <UserRound size={19} />
+                <img
+                  src={profile.avatarImage}
+                  alt={profile.name}
+                  className="h-full w-full object-cover"
+                />
               </Link>
             </header>
             <Outlet />
