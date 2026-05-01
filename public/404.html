@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VOYAGE AI</title>
+    <script>
+      (function () {
+        var repoBase = "/Guia-Turistico-AI";
+        var locationRef = window.location;
+        var path = locationRef.pathname;
+
+        if (path.indexOf(repoBase) === 0) {
+          path = path.slice(repoBase.length);
+        }
+
+        path = path.replace(/^\/+/, "");
+        var route = path ? "#/" + path : "#/";
+        window.location.replace(
+          repoBase + "/" + route + locationRef.search + locationRef.hash,
+        );
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
