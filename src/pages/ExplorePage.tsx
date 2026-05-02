@@ -119,7 +119,7 @@ export default function ExplorePage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 className="min-w-0 flex-1 border-0 bg-transparent text-base font-semibold text-white placeholder:text-white/60 focus:ring-0"
-                placeholder="Pesquisar tours ou cidades"
+                placeholder="Cidade ou tour"
               />
             </label>
             <button
@@ -182,7 +182,7 @@ export default function ExplorePage() {
               key={place.pageId}
               href={place.url}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="grid grid-cols-[72px_1fr] gap-3 rounded-3xl bg-white p-3"
             >
               <div

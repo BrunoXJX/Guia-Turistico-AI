@@ -47,19 +47,83 @@ const weatherLabels: Record<number, string> = {
   95: "Trovoada",
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+const trustedApiHosts = new Set([
+  "api.open-meteo.com",
+  "geocoding-api.open-meteo.com",
+  "pt.wikipedia.org",
+  "en.wikipedia.org",
+]);
+
+const trustedImageHosts = new Set(["upload.wikimedia.org"]);
+
+function requireTrustedHttpsUrl(url: string, hosts: Set<string>) {
+  const parsed = new URL(url);
+
+  if (parsed.protocol !== "https:" || !hosts.has(parsed.hostname)) {
+    throw new Error("Endpoint externo não autorizado");
+  }
+
+  return parsed.toString();
+}
+
+function optionalTrustedUrl(url: string | undefined, hosts: Set<string>) {
+  if (!url) {
+    return undefined;
+  }
+
+  try {
+    return requireTrustedHttpsUrl(url, hosts);
+  } catch {
+    return undefined;
+  }
+}
+
+function assertCoordinates(latitude: number, longitude: number) {
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    throw new Error("Coordenadas inválidas");
+  }
+}
+
+async function fetchJson<T>(url: string, timeoutMs = 9_000): Promise<T> {
+  const safeUrl = requireTrustedHttpsUrl(url, trustedApiHosts);
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  const response = await fetch(safeUrl, {
+    headers: { Accept: "application/json" },
+    referrerPolicy: "no-referrer",
+    signal: controller.signal,
+  }).finally(() => window.clearTimeout(timeout));
 
   if (!response.ok) {
     throw new Error(`Pedido falhou (${response.status})`);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("application/json")) {
+    throw new Error("Resposta externa inesperada");
   }
 
   return response.json() as Promise<T>;
 }
 
 export async function searchCities(query: string): Promise<CityResult[]> {
+  const cleanQuery = query.trim().slice(0, 80);
+
+  if (cleanQuery.length < 2) {
+    return [];
+  }
+
   const params = new URLSearchParams({
-    name: query,
+    name: cleanQuery,
     count: "8",
     language: "pt",
     format: "json",
@@ -77,13 +141,22 @@ export async function searchCities(query: string): Promise<CityResult[]> {
     }>;
   }>(`https://geocoding-api.open-meteo.com/v1/search?${params}`);
 
-  return data.results ?? [];
+  return (data.results ?? []).filter((city) => {
+    return (
+      Number.isFinite(city.latitude) &&
+      Number.isFinite(city.longitude) &&
+      Boolean(city.name) &&
+      Boolean(city.country)
+    );
+  });
 }
 
 export async function getWeather(
   latitude: number,
   longitude: number,
 ): Promise<WeatherSummary> {
+  assertCoordinates(latitude, longitude);
+
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
@@ -125,6 +198,8 @@ export async function getNearbyWikiPlaces(
   latitude: number,
   longitude: number,
 ): Promise<WikiPlace[]> {
+  assertCoordinates(latitude, longitude);
+
   const places = await fetchWikiPlacesForLanguage("pt", latitude, longitude);
 
   if (places.length > 0) {
@@ -139,6 +214,8 @@ async function fetchWikiPlacesForLanguage(
   latitude: number,
   longitude: number,
 ): Promise<WikiPlace[]> {
+  assertCoordinates(latitude, longitude);
+
   const params = new URLSearchParams({
     action: "query",
     generator: "geosearch",
@@ -179,8 +256,12 @@ async function fetchWikiPlacesForLanguage(
         latitude: coordinates?.lat ?? latitude,
         longitude: coordinates?.lon ?? longitude,
         distanceMeters: Math.round(coordinates?.dist ?? 0),
-        url: page.fullurl ?? `https://${language}.wikipedia.org/wiki/${page.title}`,
-        thumbnail: page.thumbnail?.source,
+        url:
+          optionalTrustedUrl(page.fullurl, trustedApiHosts) ??
+          `https://${language}.wikipedia.org/wiki/${encodeURIComponent(
+            page.title,
+          )}`,
+        thumbnail: optionalTrustedUrl(page.thumbnail?.source, trustedImageHosts),
       };
     })
     .sort((a, b) => a.distanceMeters - b.distanceMeters);

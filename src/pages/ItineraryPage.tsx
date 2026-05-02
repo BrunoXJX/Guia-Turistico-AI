@@ -176,7 +176,7 @@ export default function ItineraryPage() {
                   key={place.pageId}
                   href={place.url}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="flex items-center gap-3 rounded-3xl bg-white p-3"
                 >
                   <span className="grid h-10 w-10 place-items-center rounded-full bg-ink text-sm font-extrabold text-white">

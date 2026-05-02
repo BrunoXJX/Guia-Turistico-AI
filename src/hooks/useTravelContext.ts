@@ -30,28 +30,37 @@ export function useTravelContext() {
   const loadForCity = useCallback(async (nextCity: CityResult) => {
     setLoading(true);
     setError(null);
+    setCity(nextCity);
     setStatus(`A procurar contexto em ${nextCity.name}...`);
 
-    try {
-      const [nextWeather, nextPlaces] = await Promise.all([
-        getWeather(nextCity.latitude, nextCity.longitude),
-        getNearbyWikiPlaces(nextCity.latitude, nextCity.longitude),
-      ]);
+    const [weatherResult, placesResult] = await Promise.allSettled([
+      getWeather(nextCity.latitude, nextCity.longitude),
+      getNearbyWikiPlaces(nextCity.latitude, nextCity.longitude),
+    ]);
 
-      setCity(nextCity);
-      setWeather(nextWeather);
-      setPlaces(nextPlaces);
-      setStatus(`${nextCity.name} atualizado com dados reais`);
-    } catch (apiError) {
-      setError(
-        apiError instanceof Error
-          ? apiError.message
-          : "Não foi possível carregar dados reais",
-      );
-      setStatus("A usar dados locais temporariamente");
-    } finally {
-      setLoading(false);
+    if (weatherResult.status === "fulfilled") {
+      setWeather(weatherResult.value);
+    } else {
+      setWeather(null);
     }
+
+    if (placesResult.status === "fulfilled") {
+      setPlaces(placesResult.value);
+    } else {
+      setPlaces([]);
+    }
+
+    if (
+      weatherResult.status === "fulfilled" ||
+      placesResult.status === "fulfilled"
+    ) {
+      setStatus(`${nextCity.name} atualizado com dados reais`);
+    } else {
+      setError("Não foi possível carregar dados reais agora");
+      setStatus("A usar dados locais temporariamente");
+    }
+
+    setLoading(false);
   }, []);
 
   const searchAndLoadCity = useCallback(

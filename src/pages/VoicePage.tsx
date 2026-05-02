@@ -36,6 +36,19 @@ type SpeechRecognitionResultEvent = {
   results: ArrayLike<ArrayLike<{ transcript: string }>>;
 };
 
+function speak(text: string) {
+  if (!window.speechSynthesis) {
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "pt-PT";
+  utterance.rate = 0.96;
+  utterance.pitch = 1;
+  window.speechSynthesis.speak(utterance);
+}
+
 export default function VoicePage() {
   const { city, weather, places, loading, status } = useTravelContext();
   const [listening, setListening] = useState(false);
@@ -47,12 +60,18 @@ export default function VoicePage() {
   const [asking, setAsking] = useState(false);
 
   const askGuide = async (question = activePrompt) => {
+    const cleanQuestion = question.trim();
+
+    if (!cleanQuestion) {
+      return;
+    }
+
     setAsking(true);
-    setActivePrompt(question);
+    setActivePrompt(cleanQuestion);
 
     try {
       const openAiAnswer = await askOpenAiGuide({
-        question,
+        question: cleanQuestion,
         city,
         weather,
         places,
@@ -61,14 +80,12 @@ export default function VoicePage() {
       if (openAiAnswer) {
         setAnswer(openAiAnswer.answer);
         setAnswerSource("openai");
-        window.speechSynthesis?.speak(
-          new SpeechSynthesisUtterance(openAiAnswer.answer),
-        );
+        speak(openAiAnswer.answer);
         return;
       }
 
       const localAnswer = buildLocalGuideAnswer({
-        question,
+        question: cleanQuestion,
         city,
         weather: weather ?? undefined,
         places,
@@ -76,7 +93,7 @@ export default function VoicePage() {
 
       setAnswer(localAnswer);
       setAnswerSource("local");
-      window.speechSynthesis?.speak(new SpeechSynthesisUtterance(localAnswer));
+      speak(localAnswer);
     } finally {
       setAsking(false);
     }
@@ -222,6 +239,7 @@ export default function VoicePage() {
             />
             <button
               onClick={() => void askGuide(activePrompt)}
+              disabled={asking || activePrompt.trim().length < 2}
               className="grid h-10 w-10 place-items-center rounded-full bg-orange text-white"
               aria-label="Enviar pergunta"
             >
