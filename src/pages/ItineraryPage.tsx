@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { itineraryStops } from "../data/travelData";
+import { useTravelContext } from "../hooks/useTravelContext";
 
 const statusClasses = {
   confirmado: "bg-teal/10 text-tealDeep",
@@ -17,7 +18,9 @@ const statusClasses = {
 };
 
 export default function ItineraryPage() {
+  const { city, weather, places, status } = useTravelContext();
   const [pivotApplied, setPivotApplied] = useState(true);
+  const rainRisk = weather ? weather.rainProbability > 40 || weather.precipitation > 0 : true;
 
   return (
     <div className="space-y-5">
@@ -27,11 +30,11 @@ export default function ItineraryPage() {
             O Seu Roteiro
           </p>
           <h1 className="mt-3 text-4xl font-extrabold tracking-normal">
-            Lisboa: Dia 2
+            {city.name}: Dia 2
           </h1>
           <p className="mt-3 max-w-2xl text-base font-semibold leading-7 text-white/68">
-            Um dia em Belém ajustado ao clima, energia do grupo e reservas
-            disponíveis.
+            Roteiro ajustado com clima real, locais próximos e energia do
+            grupo.
           </p>
         </div>
 
@@ -50,8 +53,13 @@ export default function ItineraryPage() {
             </span>
           </div>
           <p className="mt-4 text-sm font-bold leading-6 text-slate/65">
-            Chuva prevista às 13:00. A IA deslocou o almoço e sugeriu uma
-            paragem interior no MAAT.
+            {weather
+              ? `${weather.label}, ${weather.temperature} °C. ${
+                  rainRisk
+                    ? "A IA privilegiou pausas abrigadas e paragens interiores."
+                    : "A IA manteve o percurso exterior com pausas curtas."
+                }`
+              : status}
           </p>
           <button
             onClick={() => setPivotApplied((value) => !value)}
@@ -108,7 +116,9 @@ export default function ItineraryPage() {
                     </p>
                     <p className="mt-3 text-sm font-semibold leading-6 text-slate/65">
                       {pivotApplied
-                        ? stop.note
+                        ? index < places.length
+                          ? `${stop.note} Perto daqui: ${places[index].title}.`
+                          : stop.note
                         : index === 1
                           ? "Horário original com maior risco de chuva no trajeto."
                           : stop.note}
@@ -129,46 +139,60 @@ export default function ItineraryPage() {
               <div className="flex items-center justify-between rounded-3xl bg-white/10 p-4">
                 <span className="flex items-center gap-3 font-bold">
                   <Sun size={20} className="text-orange" />
-                  Manhã
+                  Agora
                 </span>
-                <span className="font-extrabold">21 °C</span>
+                <span className="font-extrabold">
+                  {weather ? `${weather.temperature} °C` : "--"}
+                </span>
               </div>
               <div className="flex items-center justify-between rounded-3xl bg-white/10 p-4">
                 <span className="flex items-center gap-3 font-bold">
                   <CloudRain size={20} className="text-teal" />
-                  Almoço
+                  Chuva
                 </span>
-                <span className="font-extrabold">Chuva</span>
+                <span className="font-extrabold">
+                  {weather ? `${weather.rainProbability}%` : "--"}
+                </span>
               </div>
               <div className="flex items-center justify-between rounded-3xl bg-white/10 p-4">
                 <span className="flex items-center gap-3 font-bold">
                   <Coffee size={20} className="text-orange" />
-                  Energia
+                  Vento
                 </span>
-                <span className="font-extrabold">Média</span>
+                <span className="font-extrabold">
+                  {weather ? `${weather.windSpeed} km/h` : "--"}
+                </span>
               </div>
             </div>
           </div>
 
           <div className="glass-card rounded-[2rem] p-5">
             <p className="text-sm font-extrabold uppercase tracking-[0.16em] text-orangeDeep/70">
-              Mapa simulado
+              Locais próximos
             </p>
-            <div className="mt-4 h-72 rounded-3xl bg-cloud p-4">
-              <div className="relative h-full overflow-hidden rounded-2xl bg-white">
-                <div className="absolute inset-x-8 top-10 h-1 rounded-full bg-orange/70" />
-                <div className="absolute bottom-10 left-10 right-12 h-1 rotate-[-18deg] rounded-full bg-teal/70" />
-                {[20, 48, 76].map((left, index) => (
-                  <span
-                    key={left}
-                    className="absolute grid h-10 w-10 place-items-center rounded-full bg-ink text-sm font-extrabold text-white shadow-glow"
-                    style={{ left: `${left}%`, top: `${28 + index * 18}%` }}
-                  >
+            <div className="mt-4 grid gap-3">
+              {places.slice(0, 3).map((place, index) => (
+                <a
+                  key={place.pageId}
+                  href={place.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-3 rounded-3xl bg-white p-3"
+                >
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-ink text-sm font-extrabold text-white">
                     {index + 1}
                   </span>
-                ))}
-                <MapPinned className="absolute bottom-5 right-5 text-orange" size={32} />
-              </div>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-extrabold">
+                      {place.title}
+                    </span>
+                    <span className="text-sm font-bold text-slate/55">
+                      {Math.round(place.distanceMeters)} m
+                    </span>
+                  </span>
+                  <MapPinned className="text-orange" size={20} />
+                </a>
+              ))}
             </div>
           </div>
 

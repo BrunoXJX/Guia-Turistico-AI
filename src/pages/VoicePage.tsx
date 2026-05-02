@@ -1,5 +1,6 @@
 import {
   Bot,
+  Loader2,
   Mic,
   MicOff,
   Navigation,
@@ -9,6 +10,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { tours } from "../data/travelData";
+import { useTravelContext } from "../hooks/useTravelContext";
+import { askOpenAiGuide } from "../services/openAiGuide";
+import { buildLocalGuideAnswer } from "../services/travelApis";
 
 const prompts = [
   "Qual é a história deste bairro?",
@@ -16,9 +20,98 @@ const prompts = [
   "Muda o ritmo para algo mais calmo.",
 ];
 
+type BrowserSpeechRecognition = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+};
+
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+type SpeechRecognitionResultEvent = {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+};
+
 export default function VoicePage() {
-  const [listening, setListening] = useState(true);
+  const { city, weather, places, loading, status } = useTravelContext();
+  const [listening, setListening] = useState(false);
   const [activePrompt, setActivePrompt] = useState(prompts[0]);
+  const [answer, setAnswer] = useState(
+    "Pergunta-me algo sobre a zona, o clima ou o melhor ritmo para a tua rota.",
+  );
+  const [answerSource, setAnswerSource] = useState<"openai" | "local">("local");
+  const [asking, setAsking] = useState(false);
+
+  const askGuide = async (question = activePrompt) => {
+    setAsking(true);
+    setActivePrompt(question);
+
+    try {
+      const openAiAnswer = await askOpenAiGuide({
+        question,
+        city,
+        weather,
+        places,
+      });
+
+      if (openAiAnswer) {
+        setAnswer(openAiAnswer.answer);
+        setAnswerSource("openai");
+        window.speechSynthesis?.speak(
+          new SpeechSynthesisUtterance(openAiAnswer.answer),
+        );
+        return;
+      }
+
+      const localAnswer = buildLocalGuideAnswer({
+        question,
+        city,
+        weather: weather ?? undefined,
+        places,
+      });
+
+      setAnswer(localAnswer);
+      setAnswerSource("local");
+      window.speechSynthesis?.speak(new SpeechSynthesisUtterance(localAnswer));
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  const startVoiceInput = () => {
+    const SpeechRecognition =
+      (window as unknown as {
+        SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+      }).SpeechRecognition ??
+      (window as unknown as {
+        webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+      }).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      void askGuide(activePrompt);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "pt-PT";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    setListening(true);
+
+    recognition.onresult = (event: SpeechRecognitionResultEvent) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) {
+        void askGuide(transcript);
+      }
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognition.start();
+  };
 
   return (
     <div className="page-grid">
@@ -43,25 +136,29 @@ export default function VoicePage() {
           </div>
 
           <button
-            onClick={() => setListening((value) => !value)}
+            onClick={startVoiceInput}
             className={[
               "grid h-44 w-44 place-items-center rounded-full border border-white/20 shadow-glow transition",
-              listening ? "animate-pulse bg-orange" : "bg-white/16",
+              listening || asking ? "animate-pulse bg-orange" : "bg-white/16",
             ].join(" ")}
-            aria-label={listening ? "Pausar voz" : "Ativar voz"}
+            aria-label="Ativar voz"
           >
-            {listening ? <Mic size={64} /> : <MicOff size={64} />}
+            {asking ? (
+              <Loader2 size={64} className="animate-spin" />
+            ) : listening ? (
+              <Mic size={64} />
+            ) : (
+              <MicOff size={64} />
+            )}
           </button>
 
           <div className="w-full rounded-[2rem] border border-white/20 bg-white/12 p-4 text-left backdrop-blur-2xl">
             <p className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-[0.16em] text-white/50">
               <Sparkles size={16} />
-              Resposta contextual
+              {answerSource === "openai" ? "Resposta OpenAI" : "Resposta local"}
             </p>
             <p className="mt-3 text-lg font-bold leading-8">
-              Claro. A melhor opção tranquila a menos de 6 minutos é um café
-              com pátio interior perto da próxima paragem. Também ajustei a rota
-              para evitar a rua com mais movimento.
+              {answer}
             </p>
           </div>
         </div>
@@ -76,7 +173,7 @@ export default function VoicePage() {
             {prompts.map((prompt) => (
               <button
                 key={prompt}
-                onClick={() => setActivePrompt(prompt)}
+                onClick={() => void askGuide(prompt)}
                 className={[
                   "rounded-3xl p-4 text-left text-sm font-extrabold leading-6 transition",
                   activePrompt === prompt
@@ -98,16 +195,20 @@ export default function VoicePage() {
             <div className="flex items-center justify-between rounded-3xl bg-white/10 p-4">
               <span className="flex items-center gap-3 font-bold">
                 <Navigation size={19} className="text-orange" />
-                Próxima paragem
+                {loading ? "A carregar" : places[0]?.title ?? "Sem paragem"}
               </span>
-              <span className="text-sm font-extrabold text-white/60">120 m</span>
+              <span className="text-sm font-extrabold text-white/60">
+                {places[0] ? `${Math.round(places[0].distanceMeters)} m` : "--"}
+              </span>
             </div>
             <div className="flex items-center justify-between rounded-3xl bg-white/10 p-4">
               <span className="flex items-center gap-3 font-bold">
                 <Volume2 size={19} className="text-teal" />
-                Modo áudio
+                {weather?.label ?? status}
               </span>
-              <span className="text-sm font-extrabold text-white/60">Suave</span>
+              <span className="text-sm font-extrabold text-white/60">
+                {weather ? `${weather.temperature} °C` : city.name}
+              </span>
             </div>
           </div>
         </div>
@@ -120,6 +221,7 @@ export default function VoicePage() {
               className="min-w-0 flex-1 border-0 bg-transparent text-sm font-bold text-ink focus:ring-0"
             />
             <button
+              onClick={() => void askGuide(activePrompt)}
               className="grid h-10 w-10 place-items-center rounded-full bg-orange text-white"
               aria-label="Enviar pergunta"
             >
